@@ -450,6 +450,76 @@ module VSphereCloud
       end
     end
 
+    def instant_clone_vm(agent_id, vm_cid, cloud_properties, networks_spec, existing_disk_cids = [], environment = nil)
+      with_thread_name("instant_clone_vm(#{agent_id}, ...)") do
+        vm = vm_provider.find(vm_cid)
+        raise "Could not find VM to instant clone from '#{vm_cid}'" if vm.nil?
+
+        new_vm_cid = "vm-#{SecureRandom.uuid}"
+        begin
+          relocation_spec = Vim::Vm::RelocateSpec.new
+          relocation_spec.datastore = vm.mob.datastore[0]
+          relocation_spec.pool = vm.mob.resource_pool
+          relocation_spec.folder = @datacenter.vm_folder.mob
+
+          # We ending up with the same number of nics as the original VM, so we probably don't need this?
+          #
+          # networks_map = {}
+          # networks_spec.each_value do |network_spec|
+          #   cloud_properties = network_spec['cloud_properties']
+          #   unless cloud_properties.nil? || cloud_properties['name'].nil?
+          #     name = cloud_properties['name']
+          #     networks_map[name] ||= []
+          #     networks_map[name] << network_spec['ip']
+          #   end
+          # end
+          # networks_map
+          #
+          # networks_map.each do |network_name, ips|
+          #   network = @client.find_network_retryably(@datacenter, network_name)
+          #   ips.each do |_|
+          #     virtual_nic = Resources::Nic.create_virtual_nic(
+          #         @cloud_searcher,
+          #         network_name,
+          #         network,
+          #         vm.pci_controller.key,
+          #         {}
+          #     )
+          #     nic_config = Resources::VM.create_add_device_spec(virtual_nic)
+          #     relocation_spec.device_change << nic_config
+          #   end
+          # end
+
+          instant_clone_spec = Vim::Vm::InstantCloneSpec.new
+          instant_clone_spec.location = relocation_spec
+          instant_clone_spec.name = new_vm_cid
+
+          created_vm = @client.wait_for_task do
+            vm.mob.instant_clone(instant_clone_spec)
+          end
+
+          vm_type = VmType.new(@datacenter, cloud_properties, @pbm)
+          network_env = @cpi.generate_network_env(created_vm.devices, networks_spec, {})
+          disk_env = @cpi.generate_disk_env(created_vm.system_disk, created_vm.ephemeral_disk, vm_type)
+          env = @cpi.generate_agent_env(new_vm_cid, created_vm.mob, agent_id, network_env, disk_env)
+          env['env'] = environment
+
+          location = {
+              datacenter: @datacenter.name,
+              datastore: datastore,
+              vm: new_vm_cid,
+          }
+
+          @agent_env.set_env(created_vm.mob, location, env)
+        rescue => e
+          logger.error("Error in creating vm: #{e}, Backtrace - #{e.backtrace.join("\n")}")
+          raise e
+        end
+
+        new_vm_cid
+      end
+    end
+
     def calculate_vm_cloud_properties(vm_properties)
       required_properties = ['ram', 'cpu', 'ephemeral_disk_size']
       missing_properties = required_properties.reject { |name| vm_properties.has_key?(name) }

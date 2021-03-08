@@ -5,12 +5,12 @@ context 'exercising core CPI functionality' do
   let(:network_spec) do
     {
       'static' => {
-        'ip' => "169.254.#{rand(1..254)}.#{rand(4..254)}",
-        'netmask' => '255.255.254.0',
+        'ip' => "192.168.111.100",
+        'netmask' => '255.255.255.0',
         'cloud_properties' => {'name' => vlan},
         'default' => ['dns', 'gateway'],
-        'dns' => ['169.254.1.2'],
-        'gateway' => '169.254.1.3'
+        'dns' => ['8.8.8.8'],
+        'gateway' => '192.168.111.1'
       }
     }
   end
@@ -23,6 +23,16 @@ context 'exercising core CPI functionality' do
       'disk' => 2048,
       'cpu' => 1,
     }
+  end
+
+  context 'without existing disks' do
+    it 'should exercise the vm lifecycle' do
+      vm_lifecycle(@cpi, [], vm_type, network_spec, @stemcell_id) do |vm_id|
+        vm = @cpi.vm_provider.find(vm_id)
+        require 'pry'
+        binding.pry
+      end
+    end
   end
 
   describe 'deleting things that do not exist' do
