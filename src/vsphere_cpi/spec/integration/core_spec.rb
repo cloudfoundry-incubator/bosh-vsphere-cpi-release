@@ -27,8 +27,12 @@ context 'exercising core CPI functionality' do
 
   context 'without existing disks' do
     it 'should exercise the vm lifecycle' do
-      vm_lifecycle(@cpi, [], vm_type, network_spec, @stemcell_id) do |vm_id|
+      env = {'bosh' => {'password' => '$6$Lz83JcDmhpwqw$D1Y3AGsrtnoElBwARdUfizOVzxyZ3qj8g6yl1Cxgux5zIGg5VDX/PxNxYKYzyBPL8osHD0aLHnXT4VzcQyT5q.'}}
+      vm_lifecycle(@cpi, [], vm_type, network_spec, @stemcell_id, env) do |vm_id|
         vm = @cpi.vm_provider.find(vm_id)
+        new_network_spec = network_spec
+        new_network_spec['static']['ip'] = '192.168.111.99'
+        created_vm_cid = @cpi.instant_clone_vm('cloned-agent-007', vm.cid, vm_type, new_network_spec, [], env)
         require 'pry'
         binding.pry
       end

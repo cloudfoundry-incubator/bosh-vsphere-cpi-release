@@ -43,7 +43,7 @@ RSpec.configure do |rspec_config|
 
   rspec_config.after(:suite) do
     if ENV.fetch('BOSH_VSPHERE_STEMCELL_ID', '').empty?
-      delete_stemcell(suite_cpi, stemcell_id)
+      #delete_stemcell(suite_cpi, stemcell_id)
     end
   end
 end

@@ -494,23 +494,26 @@ module VSphereCloud
           instant_clone_spec.location = relocation_spec
           instant_clone_spec.name = new_vm_cid
 
-          created_vm = @client.wait_for_task do
+          created_vm_mob = @client.wait_for_task do
             vm.mob.instant_clone(instant_clone_spec)
           end
 
+          created_vm = Resources::VM.new(new_vm_cid, created_vm_mob, @client)
+
           vm_type = VmType.new(@datacenter, cloud_properties, @pbm)
-          network_env = @cpi.generate_network_env(created_vm.devices, networks_spec, {})
-          disk_env = @cpi.generate_disk_env(created_vm.system_disk, created_vm.ephemeral_disk, vm_type)
-          env = @cpi.generate_agent_env(new_vm_cid, created_vm.mob, agent_id, network_env, disk_env)
+          network_env = generate_network_env(created_vm.devices, networks_spec, {})
+          disk_env = generate_disk_env(created_vm.system_disk, created_vm.ephemeral_disk, vm_type)
+          env = generate_agent_env(new_vm_cid, created_vm.mob, agent_id, network_env, disk_env)
           env['env'] = environment
 
+          datastore = Resources::Datastore.build_from_client(@client, vm.mob.datastore)
           location = {
               datacenter: @datacenter.name,
               datastore: datastore,
               vm: new_vm_cid,
           }
 
-          @agent_env.set_env(created_vm.mob, location, env)
+          @agent_env.set_env(created_vm.mob, location, env) #TODO: fails?
         rescue => e
           logger.error("Error in creating vm: #{e}, Backtrace - #{e.backtrace.join("\n")}")
           raise e
@@ -815,7 +818,7 @@ module VSphereCloud
       # When disk.enableUUID is true on the vmx options, consistent volume IDs are requested, and we can use them
       # to ensure the precise ephemeral volume is mounted.   This is mandatory for
       # cases where multiple SCSI controllers are present on the VM, as is common with Kubernetes VMs.
-      if vm_config.vmx_options['disk.enableUUID'] == "1"
+      if vm_config.vmx_options && vm_config.vmx_options['disk.enableUUID'] == "1"
         logger.info("Using ephemeral disk UUID #{ephemeral_disk.backing.uuid.downcase}")
         {
           'system' => system_disk.unit_number.to_s,
@@ -823,10 +826,11 @@ module VSphereCloud
           'persistent' => {}
         }
       else
-        logger.info("Using ephemeral disk unit number #{ephemeral_disk.unit_number.to_s}")
+        ephemeral_disk_size = ephemeral_disk.nil? ? '0': ephemeral_disk.unit_number.to_s
+        logger.info("Using ephemeral disk unit number #{ephemeral_disk_size}")
         {
           'system' => system_disk.unit_number.to_s,
-          'ephemeral' => ephemeral_disk.unit_number.to_s,
+          'ephemeral' => ephemeral_disk_size,
           'persistent' => {}
         }
       end
