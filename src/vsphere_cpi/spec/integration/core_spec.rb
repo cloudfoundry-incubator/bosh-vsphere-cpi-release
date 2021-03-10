@@ -33,6 +33,7 @@ context 'exercising core CPI functionality' do
         new_network_spec = network_spec
         new_network_spec['static']['ip'] = '192.168.111.99'
         created_vm_cid = @cpi.instant_clone_vm('cloned-agent-007', vm.cid, vm_type, new_network_spec, [], env)
+
         require 'pry'
         binding.pry
       end

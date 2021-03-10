@@ -509,11 +509,11 @@ module VSphereCloud
           datastore = Resources::Datastore.build_from_client(@client, vm.mob.datastore)
           location = {
               datacenter: @datacenter.name,
-              datastore: datastore,
+              datastore: datastore[0],
               vm: new_vm_cid,
           }
 
-          @agent_env.set_env(created_vm.mob, location, env) #TODO: fails?
+          @agent_env.create_env(created_vm.mob, location, env)
         rescue => e
           logger.error("Error in creating vm: #{e}, Backtrace - #{e.backtrace.join("\n")}")
           raise e

@@ -49,6 +49,26 @@ module VSphereCloud
       update_cdrom_env(vm, location[:datastore].mob, file_name)
     end
 
+    def create_env(vm, location, env)
+      logger.info("Updating current agent env from vm '#{vm.name}' in datacenter '#{location[:datacenter]}'")
+      env_json = JSON.dump(env)
+
+      disconnect_cdrom(vm)
+      ds_hosts = get_vm_vsphere_cluster_hosts(vm)
+      @file_provider.upload_file_to_datastore(location[:datacenter],
+                                              location[:datastore].mob,
+                                              "#{location[:vm]}/env.json",
+                                              env_json, ds_hosts)
+
+      @file_provider.upload_file_to_datastore(location[:datacenter],
+                                              location[:datastore].mob,
+                                              "#{location[:vm]}/env.iso",
+                                              generate_env_iso(env_json), ds_hosts)
+
+      file_name = "[#{location[:datastore].name}] #{location[:vm]}/env.iso"
+      update_cdrom_env(vm, location[:datastore].mob, file_name)
+    end
+
     def env_iso_folder(cdrom_device)
       return unless cdrom_device && cdrom_device.backing.respond_to?(:file_name)
       File.dirname(cdrom_device.backing.file_name)
